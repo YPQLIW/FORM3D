@@ -25,6 +25,13 @@ let win = null;
 let server = null;
 let quitting = false;
 let logStream = null;
+let pageTitle = 'FORM3D';
+let updateNote = '';
+
+/** 창 제목 = 편집기 제목 + 업데이트 진행 상황 */
+function refreshTitle() {
+  if (win) win.setTitle(updateNote ? `${pageTitle}  ·  ${updateNote}` : pageTitle);
+}
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -170,6 +177,11 @@ async function start() {
     });
     if (r === 0) e.preventDefault();
   });
+  win.on('page-title-updated', (e, title) => {
+    e.preventDefault();
+    pageTitle = title;
+    refreshTitle();
+  });
   win.on('closed', () => (win = null));
   await win.loadFile(path.join(__dirname, 'loading.html'));
 
@@ -220,10 +232,31 @@ function checkForUpdates() {
   }
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
-  autoUpdater.on('error', (e) => log(`[업데이트] 확인 실패: ${e?.message ?? e}`));
-  autoUpdater.on('update-available', (info) => log(`[업데이트] 새 버전 ${info.version} 내려받는 중`));
+  autoUpdater.on('error', (e) => {
+    log(`[업데이트] 확인 실패: ${e?.message ?? e}`);
+    updateNote = '';
+    refreshTitle();
+    if (win) win.setProgressBar(-1);
+  });
+  let newVersion = '';
+  autoUpdater.on('update-available', (info) => {
+    newVersion = info.version;
+    log(`[업데이트] 새 버전 ${info.version} 내려받는 중`);
+    updateNote = `새 버전 ${info.version} 내려받는 중…`;
+    refreshTitle();
+  });
+  // 내려받는 동안 창 제목과 작업 표시줄 아이콘에 진행률 표시
+  autoUpdater.on('download-progress', (p) => {
+    if (!win) return;
+    win.setProgressBar(p.percent / 100);
+    updateNote = `새 버전 ${newVersion} 내려받는 중 ${Math.round(p.percent)}%`;
+    refreshTitle();
+  });
   autoUpdater.on('update-downloaded', async (info) => {
     if (!win) return;
+    win.setProgressBar(-1);
+    updateNote = `새 버전 ${info.version} 준비됨 (닫으면 자동 적용)`;
+    refreshTitle();
     const r = await dialog.showMessageBox(win, {
       type: 'info',
       title: 'FORM3D 업데이트',

@@ -8,7 +8,7 @@ from pathlib import Path
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 REPO_DIR = BACKEND_DIR.parent
 COMMANDS_JSON = REPO_DIR / "packages" / "model-types" / "src" / "commands.json"
-APP_VERSION = "0.4.7"
+APP_VERSION = "0.4.8"
 
 
 def _read_dotenv(path: Path) -> dict[str, str]:

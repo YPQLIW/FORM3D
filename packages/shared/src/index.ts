@@ -1,7 +1,7 @@
 /** FORM3D 전역 상수 및 범용 유틸리티 */
 
 export const APP_NAME = 'FORM3D';
-export const APP_VERSION = '0.4.7';
+export const APP_VERSION = '0.4.8';
 
 /** 모델 파일 업로드 최대 크기 (바이트). 브라우저 메모리 보호용. */
 export const MAX_MODEL_FILE_BYTES = 200 * 1024 * 1024;
