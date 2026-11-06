@@ -34,6 +34,10 @@ def create_app(settings: Settings | None = None, ai: Any = None, providers: dict
     app.include_router(ai_settings.router)
     app.include_router(v1.router)
     app.include_router(bridge.router)
+    if settings.web_dist and (settings.web_dist / "index.html").is_file():
+        from fastapi.staticfiles import StaticFiles
+        # API 경로를 모두 등록한 뒤 마지막에 연결 → /api/... 는 그대로, 나머지는 편집기 화면
+        app.mount("/", StaticFiles(directory=settings.web_dist, html=True), name="web")
     app.add_middleware(LocalOnlyMiddleware, settings=settings)
     return app
 
@@ -44,6 +48,8 @@ def main() -> None:
     settings = load_settings()
     app = create_app(settings)
     print(f"[FORM3D] 로컬 서버 시작: http://{settings.host}:{settings.port}")
+    if settings.web_dist:
+        print(f"[FORM3D] 편집기 화면 제공: {settings.web_dist}")
     print(f"[FORM3D] 저장 폴더: {settings.data_dir}")
     a = app.state.ai.describe_active()
     print(f"[FORM3D] 기본 AI: {a['label']} · {a['model'] or '모델 미선택'} ({'사용 가능' if a['configured'] else '준비 안 됨 — 화면의 AI 설정(⚙)에서 연결'})")

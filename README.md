@@ -1,5 +1,10 @@
 # FORM3D — AI 3D Creation Studio
 
+> **사용자용 설치:** [Releases](https://github.com/YPQLIW/FORM3D/releases)에서 `FORM3D-Setup-버전.exe`를 받아 설치하세요. 업데이트는 프로그램이 자동으로 합니다. 자세한 내용은 [사용설명서](docs/사용설명서.md) 0장을 보세요.
+>
+> **설치 파일 만들기 (개발자):** `package.json`의 버전을 올리고 `v버전` 태그를 push하면, GitHub Actions(`.github/workflows/desktop.yml`)가 Windows 설치 파일을 만들어 Releases에 올립니다. 설치된 프로그램은 이 Releases를 보고 자동 업데이트합니다.
+
+
 텍스트·이미지로 3D 모델을 만들고, 직접 편집하거나 AI와 대화하며 수정하는 3D 제작 프로그램입니다.
 웹과 Windows(Tauri) 버전을 목표로 단계별로 개발합니다.
 

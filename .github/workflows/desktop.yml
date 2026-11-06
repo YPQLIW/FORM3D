@@ -1,0 +1,98 @@
+# FORM3D 설치형 프로그램(Windows) 만들기
+# - 버전 태그(v0.4.5 등)를 올리면: 설치 파일을 만들고 GitHub Releases 에 올립니다 → 설치된 프로그램이 자동 업데이트
+# - Actions 화면에서 직접 실행(workflow_dispatch)하면: 설치 파일만 만들어 다운로드용으로 보관합니다 (릴리스 안 함)
+name: Desktop (Windows)
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  PYTHON_VERSION: '3.12.10'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 웹 편집기 빌드
+        run: |
+          npm ci
+          npm run build
+
+      - name: 테스트 (편집 엔진 · 서버)
+        run: |
+          npx vitest run
+          python -m pip install -r backend/requirements-dev.txt
+          cd backend
+          python -m pytest -q
+
+      - name: 설치 파일 재료 모으기
+        run: node scripts/stage-desktop.mjs
+
+      - name: Windows용 Python 내장
+        shell: pwsh
+        run: |
+          $py = "desktop/stage/python"
+          $zip = "python-embed.zip"
+          Invoke-WebRequest "https://www.python.org/ftp/python/$env:PYTHON_VERSION/python-$env:PYTHON_VERSION-embed-amd64.zip" -OutFile $zip
+          Expand-Archive $zip -DestinationPath $py
+          $pth = Get-ChildItem "$py/python*._pth" | Select-Object -First 1
+          # 서버 코드 위치와 라이브러리 폴더를 경로에 추가
+          Set-Content $pth.FullName "python312.zip`r`n.`r`nLib\site-packages`r`n..\form3d\backend`r`nimport site"
+          python -m pip install --no-compile --only-binary=:all: --platform win_amd64 --python-version 3.12 --implementation cp `
+            --target "$py/Lib/site-packages" -r backend/requirements.txt
+
+      - name: 내장 Python으로 서버가 뜨는지 확인
+        shell: pwsh
+        run: |
+          $env:FORM3D_WEB_DIST = (Resolve-Path desktop/stage/form3d/web).Path
+          $env:FORM3D_DATA_DIR = "$env:RUNNER_TEMP\form3d-data"
+          $env:FORM3D_PORT = "8799"
+          $p = Start-Process -FilePath desktop/stage/python/python.exe -ArgumentList "-m","app.main" `
+            -WorkingDirectory desktop/stage/form3d/backend -PassThru -NoNewWindow
+          $ok = $false
+          for ($i = 0; $i -lt 60; $i++) {
+            Start-Sleep -Milliseconds 500
+            try {
+              $h = Invoke-RestMethod http://127.0.0.1:8799/api/health
+              $page = Invoke-WebRequest http://127.0.0.1:8799/ -UseBasicParsing
+              if ($h.ok -and $page.Content -match 'FORM3D') { $ok = $true; break }
+            } catch {}
+          }
+          Stop-Process -Id $p.Id -Force
+          if (-not $ok) { throw "내장 Python 서버가 시작되지 않았습니다" }
+          Write-Host "서버 확인 완료: health ok, 편집기 화면 제공"
+
+      - name: 설치 파일 만들기
+        working-directory: desktop
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          npm ci
+          if ("${{ github.ref_type }}" -eq "tag") {
+            npx electron-builder --win nsis --publish always
+          } else {
+            npx electron-builder --win nsis --publish never
+          }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FORM3D-Setup
+          path: desktop/release/*.exe
+          retention-days: 14

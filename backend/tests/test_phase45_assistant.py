@@ -103,3 +103,26 @@ def test_oni_assist_continues_conversation(client, token, fake_ai):
     assert r["state"] == "done" and r["conversation"] == "oni-chat-1" and r["plan"]["message"] == "원기둥을 하나 만들겠습니다."
     hist = json.dumps(client.app.state.ai_store.history("oni-chat-1", 20), ensure_ascii=False)
     assert "원기둥 하나 만들어 줘" in hist and "Cylinder(id u-cyl-9)" in hist
+
+
+def test_server_serves_editor_for_desktop_app(tmp_path):
+    """설치형 프로그램: 서버 하나가 편집기 화면과 API를 같은 주소로 제공"""
+    from fastapi.testclient import TestClient
+
+    from app.core.config import Settings
+    from app.main import create_app
+    web = tmp_path / "web"
+    (web / "assets").mkdir(parents=True)
+    (web / "index.html").write_text("<html>FORM3D</html>", encoding="utf-8")
+    (web / "assets" / "a.js").write_text("console.log(1)", encoding="utf-8")
+    s = Settings(data_dir=tmp_path / "data", port=8765, web_dist=web)
+    assert "http://127.0.0.1:8765" in s.allowed_origins
+    app = create_app(s)
+    with TestClient(app) as c:
+        assert "FORM3D" in c.get("/").text and c.get("/assets/a.js").status_code == 200
+        assert c.get("/api/health").json()["ok"] is True
+        r = c.put("/api/ai/settings", json={"params": {"temperature": 0.2, "max_tokens": 4000, "timeout": 200, "history": 12}},
+                  headers={"Origin": "http://127.0.0.1:8765"})
+        assert r.status_code == 200
+        assert c.get("/api/health", headers={"Origin": "http://evil.example"}).status_code == 403
+    app.state.store.close()

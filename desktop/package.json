@@ -1,0 +1,40 @@
+{
+  "name": "form3d-desktop",
+  "productName": "FORM3D",
+  "version": "0.4.5",
+  "description": "FORM3D — AI 3D Creation Studio (설치형 프로그램)",
+  "author": "YPQLIW",
+  "private": true,
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis --publish always"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.10"
+  },
+  "devDependencies": {
+    "electron": "44.9.0",
+    "electron-builder": "26.17.0"
+  },
+  "build": {
+    "appId": "com.ypqliw.form3d",
+    "productName": "FORM3D",
+    "directories": { "output": "release" },
+    "files": ["main.cjs", "loading.html", "package.json", "build/icon.png"],
+    "extraResources": [
+      { "from": "stage/form3d", "to": "form3d" },
+      { "from": "stage/python", "to": "python" }
+    ],
+    "win": { "target": "nsis", "icon": "build/icon.png", "artifactName": "FORM3D-Setup-${version}.${ext}" },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "FORM3D"
+    },
+    "publish": [{ "provider": "github", "owner": "YPQLIW", "repo": "FORM3D", "releaseType": "release" }]
+  }
+}

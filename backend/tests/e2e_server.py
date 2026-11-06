@@ -36,7 +36,10 @@ class ScriptedPlanner:
 if __name__ == "__main__":
     data_dir = Path(sys.argv[1])
     port = int(sys.argv[2]) if len(sys.argv) > 2 else 8765
-    settings = Settings(data_dir=data_dir, port=port, bridge_timeout_s=10, confirm_timeout_s=60)
+    import os
+    web = os.environ.get("FORM3D_WEB_DIST")  # 설정 시 서버가 편집기 화면도 제공 (설치형 프로그램과 같은 구성)
+    settings = Settings(data_dir=data_dir, port=port, bridge_timeout_s=10, confirm_timeout_s=60,
+                        web_dist=Path(web) if web else None)
     # 세 번째 인자 real: 실제 제공자 코드(Claude·DashScope·Ollama) 사용 — Phase 4 E2E는 가짜 Ollama 서버에 연결
     real = len(sys.argv) > 3 and sys.argv[3] == "real"
     # 네 번째 인자: Qwen API(DashScope) 주소를 테스트용 가짜 서버로 바꿈 (Phase 4.5 E2E 전용)

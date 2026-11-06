@@ -51,6 +51,15 @@ class Settings:
             f"http://{h}:{p}" for h in ("localhost", "127.0.0.1") for p in (5173, 4173)
         ]
     )
+    # 설치형 프로그램: 서버가 편집기 화면(빌드된 웹 파일)도 함께 제공 (FORM3D_WEB_DIST)
+    web_dist: Path | None = None
+
+    def __post_init__(self) -> None:
+        # 서버가 화면을 직접 제공할 때는 같은 주소(127.0.0.1:포트)에서 오는 요청도 허용
+        for h in ("localhost", "127.0.0.1"):
+            o = f"http://{h}:{self.port}"
+            if o not in self.allowed_origins:
+                self.allowed_origins.append(o)
 
     @property
     def ai_configured(self) -> bool:
@@ -76,4 +85,5 @@ def load_settings(env_file: Path | None = None) -> Settings:
         anthropic_api_key=get("ANTHROPIC_API_KEY"),
         ai_model=get("FORM3D_AI_MODEL") or "claude-opus-5-5",
         ai_effort=effort,
+        web_dist=Path(get("FORM3D_WEB_DIST")).expanduser() if get("FORM3D_WEB_DIST") else None,
     )
