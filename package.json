@@ -1,7 +1,7 @@
 {
   "name": "form3d",
   "private": true,
-  "version": "0.4.5",
+  "version": "0.4.6",
   "type": "module",
   "description": "FORM3D — AI 3D Creation Studio",
   "workspaces": [

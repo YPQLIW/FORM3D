@@ -11,6 +11,7 @@ const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const http = require('node:http');
 const net = require('node:net');
+const os = require('node:os');
 const path = require('node:path');
 
 const PORT = Number(process.env.FORM3D_PORT || 8765);
@@ -37,8 +38,29 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(start);
 }
 
+/** 저장 폴더: 예전 방식(npm run dev)의 로컬 서버와 똑같이 '사용자 폴더\\Documents\\FORM3D' 를 씀
+ *  (OneDrive 가 문서 폴더를 옮겨 둔 PC에서도 예전 프로젝트·AI 키·설정을 그대로 이어서 쓰도록) */
 function dataDir() {
-  return path.join(app.getPath('documents'), 'FORM3D');
+  const docs = path.join(os.homedir(), 'Documents');
+  return path.join(fs.existsSync(docs) ? docs : os.homedir(), 'FORM3D');
+}
+
+/** 예전 방식에서 'npm run ai:key' 로 저장한 Claude 키(backend\\.env)를 찾아 그대로 사용 (값은 기록하지 않음) */
+function legacyEnvKeys() {
+  const out = {};
+  const desktops = [path.join(os.homedir(), 'Desktop'), path.join(os.homedir(), 'OneDrive', 'Desktop'), path.join(os.homedir(), 'OneDrive', '바탕 화면')];
+  for (const d of desktops) {
+    const f = path.join(d, 'FORM3D', 'backend', '.env');
+    try {
+      for (const line of fs.readFileSync(f, 'utf8').split(/\r?\n/)) {
+        const m = line.match(/^\s*(ANTHROPIC_API_KEY|DASHSCOPE_API_KEY)\s*=\s*["']?([^"'\s]+)["']?\s*$/);
+        if (m && !out[m[1]]) out[m[1]] = m[2];
+      }
+    } catch {
+      /* 없으면 넘어감 */
+    }
+  }
+  return out;
 }
 
 function log(line) {
@@ -81,6 +103,7 @@ function startServer() {
     cwd: BACKEND,
     windowsHide: true,
     env: {
+      ...legacyEnvKeys(),
       ...process.env,
       PYTHONUTF8: '1',
       PYTHONIOENCODING: 'utf-8',

@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from fastapi import FastAPI
@@ -27,7 +28,8 @@ def create_app(settings: Settings | None = None, ai: Any = None, providers: dict
     app.state.store = ProjectStore(settings.data_dir, settings.versions_to_keep)
     app.state.tokens = TokenStore(settings.data_dir)
     app.state.bridge = bridge.EditorBridge()
-    app.state.ai_store = AIStore(settings.data_dir, app.state.store.db, {"claude": settings.anthropic_api_key})
+    app.state.ai_store = AIStore(settings.data_dir, app.state.store.db, {"claude": settings.anthropic_api_key,
+                                                                          "dashscope": os.environ.get("DASHSCOPE_API_KEY") or None})
     app.state.ai = AIManager(app.state.ai_store, settings.ai_effort, providers=providers, override=ai)
     app.state.jobs = jobs.JobTracker()
     app.include_router(local.router)
