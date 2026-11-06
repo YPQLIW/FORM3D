@@ -61,7 +61,7 @@ export function StatusBar() {
       <span className="truncate">선택: {sel ? `${sel.name || sel.type}${selCount > 1 ? ` 외 ${selCount - 1}개` : ''}` : '없음'}</span>
       <span className="ml-auto flex items-center gap-4">
         <SaveStatus />
-        <span>FORM3D v{APP_VERSION} · Phase 4</span>
+        <span>FORM3D v{APP_VERSION}</span>
       </span>
     </footer>
   );

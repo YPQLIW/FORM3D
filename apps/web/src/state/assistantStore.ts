@@ -75,7 +75,24 @@ const loadPolicy = (): ExternalPolicy => {
 
 let seq = 1;
 export function newConversationId(): string {
-  return `conv-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const id = `conv-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  try {
+    localStorage.setItem('form3d.conversation', id);
+  } catch {
+    /* 무시 */
+  }
+  return id;
+}
+
+/** 프로그램을 다시 켜도 마지막 대화를 이어가도록 대화 ID를 기억 */
+function lastConversationId(): string {
+  try {
+    const v = localStorage.getItem('form3d.conversation');
+    if (v && /^conv-[\w-]{4,60}$/.test(v)) return v;
+  } catch {
+    /* 무시 */
+  }
+  return newConversationId();
 }
 const MAX = 200;
 
@@ -86,7 +103,7 @@ export const useAssistantStore = create<AssistantState>((set) => ({
   thinkingSince: 0,
   externalPolicy: loadPolicy(),
   bridgeConnected: false,
-  conversation: newConversationId(),
+  conversation: lastConversationId(),
   add: (e) => {
     const id = seq++;
     set((s) => ({ entries: [...s.entries, { ...e, id, time: Date.now() } as AssistantEntry].slice(-MAX) }));

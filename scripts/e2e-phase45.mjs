@@ -64,6 +64,11 @@ function think(body) {
     return out('plan', { message: `방금 만든 ${recentName}의 크기를 1.25배로 키우겠습니다.`, summary: `${recentName} 1.25배 확대`, steps: [step('transform', { target: { ids: [recentId] }, scale_by: 1.25 })] });
   }
   if (/장면에 뭐|뭐가 있/.test(text)) return out('answer', { message: `지금 장면에는 ${names.length}개가 있습니다: ${names.join(', ')}.` });
+  if (/좋아하는 색이 뭐/.test(text)) return out('answer', { message: /초록색이에요/.test(history) ? '초록색이라고 하셨어요.' : '모르겠어요.' });
+  if (/그거 지워/.test(text)) return out('question', { message: '어느 것을 지울까요?', options: names.slice(0, 5) });
+  if (/구 3개/.test(text))
+    return out('plan', { message: '구 3개를 만들어 칠하고 묶겠습니다.', summary: '구 3개 · 색 · 그룹', steps: [step('create_primitive', { shape: 'sphere', count: 3 }), step('set_material', { target: 'created', color: '#e53935' }), step('group', { target: 'created', name: 'Spheres' })] });
+  if (/몇 개/.test(text)) return out('answer', { message: `${names.length}개 있습니다.` });
   if (/하나 지워/.test(text)) return out('question', { message: '어느 것을 지울까요?', options: names.slice(0, 5) });
   if (names.includes(text) && /어느 것을 지울까요/.test(history))
     return out('plan', { message: `${text}을(를) 삭제하겠습니다.`, summary: `${text} 삭제`, steps: [step('delete', { target: { names: [text] } })] });
@@ -241,6 +246,30 @@ try {
   await page.getByTestId('thinking-cancel').click();
   await page.waitForFunction(() => !document.querySelector('[data-testid=assistant-thinking]'));
   check(/취소했습니다/.test(await page.locator('[data-entry]').last().innerText()), '취소 버튼으로 요청 중단');
+
+  console.log('▶ 10. 1단계: 모델 전환 · 대화 기록 유지 · 실제 AI 점검 화면');
+  check((await page.getByTestId('model-switch').inputValue()) === 'dashscope', 'Assistant에서 바로 모델 전환 선택 상자 (Qwen API 선택됨)');
+  await page.reload();
+  await page.waitForSelector('canvas');
+  await ev(() => window.__FORM3D_PROJECT__.refreshServer());
+  await page.getByRole('tab', { name: 'AI Assistant' }).click();
+  await page.waitForFunction(() => /이전 대화/.test(document.body.innerText), null, { timeout: 8000 });
+  const restoredText = await page.locator('[data-entry]').allInnerTexts();
+  check(restoredText.some((t) => /원기둥 하나 만들어 줘/.test(t)) && restoredText.some((t) => /AI: .*원기둥/.test(t)), '다시 켜도 이전 대화가 화면에 복원됨', restoredText.slice(0, 6));
+  await page.getByTestId('ai-settings-button').click();
+  await page.getByRole('dialog', { name: 'AI 설정' }).getByRole('tab', { name: '실제 AI 점검' }).click();
+  await page.getByTestId('selftest-start').click();
+  await page.waitForFunction(() => ['done', 'cancelled'].includes(document.querySelector('[data-testid=selftest-result]')?.getAttribute('data-state') ?? ''), null, { timeout: 60000 });
+  const r = {};
+  for (let i = 1; i <= 8; i++) r[i] = await page.getByTestId(`selftest-item-${i}`).getAttribute('data-result');
+  check(JSON.stringify(r) === JSON.stringify({ 1: 'pass', 2: 'pass', 3: 'pass', 4: 'pass', 5: 'pass', 6: 'skip', 7: 'skip', 8: 'pass' }), '점검 화면: 1~5·8 통과, 6·7 건너뜀(키·Ollama 없음) — 판정 기능 확인', r);
+  check(/reports/.test(await page.getByTestId('selftest-result').innerText()), '보고서 파일 저장 위치 표시');
+  const reports = fs.readdirSync(path.join(DATA_DIR, 'reports'));
+  check(reports.length === 1 && /실제 AI 모델 테스트/.test(fs.readFileSync(path.join(DATA_DIR, 'reports', reports[0]), 'utf8')), '보고서 .md 파일 생성');
+  const hist = await v1('GET', '/conversations/oni-e2e');
+  check(hist.status === 200 && hist.body.messages.some((m) => m.role === 'result' && /만든 것/.test(m.text)), '온이 대화 기록 조회 (요청·AI 응답·실행 결과)', hist.body);
+  await shot('p45-03-selftest');
+  await page.keyboard.press('Escape');
 
   console.log('▶ 9. API 오류와 연결 끊김 구분 안내');
   e = await ask('키오류 테스트');

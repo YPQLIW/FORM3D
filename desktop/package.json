@@ -1,7 +1,7 @@
 {
   "name": "form3d-desktop",
   "productName": "FORM3D",
-  "version": "0.4.8",
+  "version": "0.5.0",
   "description": "FORM3D — AI 3D Creation Studio (설치형 프로그램)",
   "author": "YPQLIW",
   "private": true,

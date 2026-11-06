@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { AiStatus } from '../lib/api';
 
-export type SettingsTab = 'providers' | 'models' | 'usage' | 'engines' | 'oni';
+export type SettingsTab = 'providers' | 'models' | 'selftest' | 'usage' | 'engines' | 'oni';
 
 interface S {
   open: boolean;

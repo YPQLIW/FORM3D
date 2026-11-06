@@ -91,12 +91,17 @@ class OllamaProvider:
             "format": schema,
             "stream": False,
             "think": False,
+            # num_ctx: Ollama 기본(2~4천 토큰)으로는 지시문+장면 정보가 잘려 엉뚱한 답이 나옴 → 8천으로
             "options": {"temperature": float(params.get("temperature", 0.2)),
-                        "num_predict": int(params.get("max_tokens") or 4000)},
+                        "num_predict": int(params.get("max_tokens") or 4000), "num_ctx": 8192},
         }
         try:
             with self._client(float(params.get("timeout") or 180)) as c:
                 r = c.post("/api/chat", json=body)
+                if r.status_code == 400 and "think" in r.text.lower():
+                    # 생각 모드 설정을 모르는 예전 Ollama·모델 → 그 설정 없이 다시
+                    body.pop("think", None)
+                    r = c.post("/api/chat", json=body)
         except httpx.TimeoutException as e:
             raise AIError(504, "ai_timeout", "로컬 모델 응답 시간이 초과되었습니다",
                           "PC 사양에 비해 모델이 클 수 있습니다. 더 작은 모델을 쓰거나 시간 제한을 늘리세요") from e

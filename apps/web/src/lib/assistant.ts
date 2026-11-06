@@ -146,6 +146,34 @@ function feedback(entryJob: CommandJob, note: string): void {
   void api.aiFeedback(st().conversation, `작업 ${entryJob.id}: ${note}`).catch(() => undefined);
 }
 
+/** 프로그램을 다시 켰을 때 마지막 대화를 화면에 다시 보여 줌 (서버에 저장된 기록) */
+let restored = false;
+export async function restoreConversation(): Promise<void> {
+  if (restored || st().entries.length || useProjectStore.getState().server !== 'online') return;
+  restored = true;
+  try {
+    const rows = await api.aiConversation(st().conversation);
+    const shown = rows.filter((r) => (r.role === 'user' && !r.content.startsWith('[실행 결과]')) || r.role === 'assistant');
+    if (!shown.length) return;
+    st().add({ kind: 'note', level: 'info', text: `이전 대화 ${shown.length}개를 불러왔습니다. AI는 이 대화를 기억하고 있습니다. 처음부터 하려면 "새 대화"를 누르세요.` });
+    for (const r of shown.slice(-30)) {
+      if (r.role === 'user') st().add({ kind: 'user', text: r.content });
+      else {
+        let text = r.content;
+        try {
+          const b = JSON.parse(r.content) as { message?: string; summary?: string };
+          text = b.message || b.summary || '';
+        } catch {
+          /* 그대로 */
+        }
+        if (text) st().add({ kind: 'note', level: 'info', text: `AI: ${text}` });
+      }
+    }
+  } catch {
+    /* 기록을 못 불러와도 새로 시작하면 됨 */
+  }
+}
+
 /** 새 대화 (이전 맥락 지우기) */
 export function newConversation(): void {
   const old = st().conversation;

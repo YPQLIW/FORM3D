@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Bot, Check, CircleSlash, Cpu, Loader2, MessageSquarePlus, Plug, Send, Settings, Undo2, User, Wrench, X } from 'lucide-react';
-import { openAiSettings } from '../../lib/aiSettings';
+import { loadAiStatus, openAiSettings, saveAiSettings } from '../../lib/aiSettings';
+import { useAiSettings } from '../../state/aiSettingsStore';
 import { describeStep } from '@form3d/editor-core';
 import { useAssistantStore, type AssistantEntry, type ExternalPolicy } from '../../state/assistantStore';
 import { useProjectStore } from '../../state/projectStore';
 import { useEngineRevision } from '../../state/engine';
-import { aiAvailable, askFix, cancelThinking, canUndoJob, cancelEntry, executeEntry, metaLabel, newConversation, submitRequest, undoJob } from '../../lib/assistant';
+import { aiAvailable, askFix, cancelThinking, restoreConversation, canUndoJob, cancelEntry, executeEntry, metaLabel, newConversation, submitRequest, undoJob } from '../../lib/assistant';
 import { Button } from '../ui/Button';
 
 type JobEntry = Extract<AssistantEntry, { kind: 'job' }>;
@@ -247,6 +248,47 @@ function ExternalSettings() {
   );
 }
 
+const PNAME: Record<string, string> = { claude: 'Claude', dashscope: 'Qwen API', ollama: 'Ollama' };
+
+/** Assistant에서 바로 AI 모델 바꾸기 (연결된 것만 표시) */
+function ModelSwitch() {
+  const status = useAiSettings((s) => s.status);
+  const health = useProjectStore((s) => s.health);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const ready = (status?.providers ?? []).filter((p) => p.state === 'ready');
+  if (!status || ready.length === 0) return null;
+  const current = health?.ai.configured ? health.ai.provider ?? '' : '';
+  return (
+    <label className="flex items-center gap-1 text-[10px] text-muted" title={err ?? 'AI Assistant가 쓸 모델'}>
+      모델
+      <select
+        data-testid="model-switch"
+        aria-label="AI 모델 전환"
+        disabled={busy}
+        value={current}
+        onChange={async (e) => {
+          const p = ready.find((x) => x.id === e.target.value);
+          if (!p) return;
+          setBusy(true);
+          setErr(await saveAiSettings({ default: { provider: p.id, model: p.model || '' }, tasks: { ...status.settings.tasks, assistant: null } }));
+          setBusy(false);
+        }}
+        className="rounded border border-line bg-panel-2 px-1 py-0.5 text-[10px] text-text"
+      >
+        {!current && <option value="">선택</option>}
+        {ready.map((p) => (
+          <option key={p.id} value={p.id}>
+            {PNAME[p.id] ?? p.id}
+            {p.model ? ` · ${p.model}` : ''} {p.paid ? '(유료)' : '(무료)'}
+          </option>
+        ))}
+      </select>
+      {err && <span className="text-red-400">{err}</span>}
+    </label>
+  );
+}
+
 /** AI Assistant: 자연어 → 구조화된 JSON 명령 → 검증 → 미리보기 → 실행 */
 export function AssistantPanel() {
   const entries = useAssistantStore((s) => s.entries);
@@ -263,6 +305,12 @@ export function AssistantPanel() {
   useEffect(() => {
     end.current?.scrollIntoView({ block: 'end' });
   }, [entries.length, entries.at(-1)]);
+  useEffect(() => {
+    if (server === 'online') {
+      void restoreConversation();
+      void loadAiStatus();
+    }
+  }, [server]);
 
   const aiStatus =
     server !== 'online'
@@ -298,6 +346,7 @@ export function AssistantPanel() {
         <span className={`text-[10px] ${ai ? 'text-emerald-400' : 'text-muted'}`} data-testid="ai-status">
           {aiStatus}
         </span>
+        <ModelSwitch />
         <div className="flex-1" />
         <button type="button" onClick={newConversation} data-testid="new-conversation" title="새 대화 (AI가 이전 대화를 잊음)"
           className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-muted hover:bg-white/5 hover:text-text">

@@ -24,6 +24,7 @@
 - 응답과 `GET /jobs/{id}`에는 `conversation`, `plan.message`(AI가 사용자에게 하는 말), `result.created`([{id, name}])가 들어 있습니다.
 - 예시: `{"text":"원기둥 하나 만들어 줘","conversation":"oni-1"}`를 보낸 뒤 `{"text":"조금 더 크게 해줘","conversation":"oni-1"}`를 보내면, 방금 만든 원기둥을 1.25배로 키우는 계획이 나옵니다.
 - 현재 장면 상태는 `GET /scene`으로 확인합니다.
+- 대화 기록은 `GET /conversations/{conversation}` (scope `scene:read`)으로 확인합니다. 결과는 `messages: [{role: user|assistant|result, text, kind?, steps?}]`입니다. `conversation`을 생략했던 경우 ID는 `oni-<토큰ID>`입니다.
 | GET | /jobs/{id} | (토큰) | 진행 상태: queued · planning · awaiting_confirmation · running · done · failed · rejected · cancelled · answered · error |
 | GET | /engines | (토큰) | 생성 엔진 목록 (이미지·애니메이션·영상·3D: 모두 "planned", 사용 불가) |
 | POST | /engines/{id}/jobs | (토큰) | 현재 항상 501 (구현 안 됨) |

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Cpu, CreditCard, Download, KeyRound, Loader2, Plug, RefreshCw, Trash2, X, XCircle } from 'lucide-react';
 import { formatBytes } from '@form3d/shared';
-import { api, type AiSettings, type ModelInfo, type ModelSel, type ProviderId, type ProviderInfo, type TestResult, type UsageRow } from '../../lib/api';
+import { api, type AiSettings, type ModelInfo, type ModelSel, type ProviderId, type ProviderInfo, type SelfTestState, type TestResult, type UsageRow } from '../../lib/api';
 import { loadAiStatus, saveAiSettings } from '../../lib/aiSettings';
 import { refreshServer } from '../../lib/project';
 import { useAiSettings, type SettingsTab } from '../../state/aiSettingsStore';
@@ -11,6 +11,7 @@ import { Button } from '../ui/Button';
 const TABS: [SettingsTab, string][] = [
   ['providers', 'AI 제공자'],
   ['models', '기본·작업별 모델'],
+  ['selftest', '실제 AI 점검'],
   ['usage', '사용량·비용'],
   ['engines', '크리에이티브 엔진'],
   ['oni', '온이 연결'],
@@ -442,6 +443,144 @@ function UsageTab({ settings }: { settings: AiSettings }) {
 }
 
 /** AI 설정 (제공자 · 모델 · 키 · Ollama · 테스트 · 사용량 · 엔진 · 온이) */
+const PN: Record<string, string> = { claude: 'Claude', dashscope: 'Qwen API', ollama: 'Ollama' };
+const RES: Record<string, [string, string]> = {
+  pending: ['대기', 'text-muted'],
+  running: ['진행 중…', 'text-accent'],
+  pass: ['✅ 통과', 'text-emerald-400'],
+  fail: ['❌ 실패', 'text-red-400'],
+  skip: ['⏭ 건너뜀', 'text-muted'],
+};
+
+/** 실제 AI 점검: 이 PC에 연결된 실제 모델로 완료 조건 1~8을 자동 확인하고 보고서를 만듦 */
+function SelfTestTab({ providers }: { providers: ProviderInfo[] }) {
+  const ready = providers.filter((p) => p.state === 'ready');
+  const active = useProjectStore((s) => s.health?.ai);
+  const [pid, setPid] = useState<string>(active?.configured && active.provider ? active.provider : ready[0]?.id ?? '');
+  const [run, setRun] = useState<SelfTestState | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [open, setOpen] = useState<number | null>(null);
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<number | null>(null);
+  const sel = ready.find((p) => p.id === pid);
+
+  useEffect(() => () => {
+    if (timer.current) window.clearInterval(timer.current);
+  }, []);
+  const poll = (id: string) => {
+    if (timer.current) window.clearInterval(timer.current);
+    timer.current = window.setInterval(async () => {
+      try {
+        const s = await api.aiSelfTestGet(id);
+        setRun(s);
+        if (s.state !== 'running' && timer.current) window.clearInterval(timer.current);
+      } catch {
+        /* 다음에 다시 */
+      }
+    }, 1000);
+  };
+  const start = async () => {
+    setErr(null);
+    setCopied(false);
+    try {
+      const s = await api.aiSelfTestStart(pid || undefined);
+      setRun(s);
+      poll(s.id);
+    } catch (e) {
+      const x = e as { message: string; hint?: string };
+      setErr([x.message, x.hint].filter(Boolean).join(' — '));
+    }
+  };
+  const done = run && run.state !== 'running';
+  const counts = run ? { pass: run.items.filter((i) => i.result === 'pass').length, fail: run.items.filter((i) => i.result === 'fail').length, skip: run.items.filter((i) => i.result === 'skip').length } : null;
+
+  return (
+    <div className="space-y-3 text-[12px]" data-testid="selftest-tab">
+      <p className="text-[11px] text-muted">
+        이 PC에 연결된 <b className="text-text">실제 AI 모델</b>로 1단계 완료 조건 8가지를 자동으로 확인합니다. 장면은 바꾸지 않고(계획만 받아 검증), 임시 대화는 끝나면 지웁니다.
+        결과 보고서는 <span className="text-text">문서\FORM3D\reports</span>에 저장됩니다.
+      </p>
+      {ready.length === 0 ? (
+        <p className="text-amber-300">연결된 AI가 없습니다. "AI 제공자" 탭에서 Ollama·Qwen API·Claude 중 하나를 먼저 연결하세요.</p>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-muted">점검할 모델</span>
+          <select aria-label="점검할 모델" data-testid="selftest-provider" value={pid} onChange={(e) => setPid(e.target.value)} disabled={run?.state === 'running'} className={inputCls}>
+            {ready.map((p) => (
+              <option key={p.id} value={p.id}>
+                {PN[p.id] ?? p.id}
+                {p.model ? ` · ${p.model}` : ''} {p.paid ? '(유료)' : '(무료)'}
+              </option>
+            ))}
+          </select>
+          {run?.state === 'running' ? (
+            <Button variant="ghost" onClick={() => void api.aiSelfTestCancel(run.id)} data-testid="selftest-cancel">
+              중단
+            </Button>
+          ) : (
+            <Button variant="primary" onClick={() => void start()} data-testid="selftest-start">
+              점검 시작
+            </Button>
+          )}
+          {sel?.paid && <span className="text-[10px] text-amber-300">유료 모델: 약 10~12회 요청 (몇십 원 이하 예상)</span>}
+          {sel && !sel.paid && <span className="text-[10px] text-muted">로컬 모델은 PC 사양에 따라 몇 분 걸릴 수 있습니다</span>}
+        </div>
+      )}
+      {err && <p className="text-red-400" data-testid="selftest-error">{err}</p>}
+      {run && (
+        <div className="space-y-1.5" data-testid="selftest-result" data-state={run.state}>
+          <p className="text-muted">
+            {run.providerName} · {run.model} — {run.state === 'running' ? `${run.current}번 점검 중…` : run.state === 'cancelled' ? '중단됨' : '완료'}
+            {done && counts && ` · 통과 ${counts.pass} · 실패 ${counts.fail} · 건너뜀 ${counts.skip}`}
+          </p>
+          {run.items.map((it) => {
+            const [label, cls] = RES[it.result] ?? [it.result, ''];
+            return (
+              <div key={it.no} className="rounded border border-line bg-panel-2" data-testid={`selftest-item-${it.no}`} data-result={it.result}>
+                <button type="button" className="flex w-full items-center gap-2 px-2 py-1 text-left" onClick={() => setOpen(open === it.no ? null : it.no)}>
+                  <span className="w-4 text-muted">{it.no}</span>
+                  <span className="flex-1 text-text">{it.title}</span>
+                  <span className={cls}>{label}</span>
+                  {it.seconds != null && <span className="w-12 text-right text-[10px] text-muted">{it.seconds}초</span>}
+                </button>
+                {(it.note || open === it.no) && <p className="px-2 pb-1 pl-8 text-[11px] text-muted">{it.note}</p>}
+                {open === it.no && (it.log ?? []).map((l, i) => (
+                  <div key={i} className="mx-2 mb-1.5 ml-8 rounded bg-bg p-1.5 text-[11px] select-text">
+                    <div className="text-muted">요청: {l.request}</div>
+                    <div className="text-violet-200">AI({l.response.kind}): {l.response.message || '(메시지 없음)'}</div>
+                    {l.response.options && l.response.options.length > 0 && <div className="text-muted">선택지: {l.response.options.join(', ')}</div>}
+                    {l.response.steps && l.response.steps.length > 0 && <div className="font-mono text-[10px] text-muted">{JSON.stringify(l.response.steps).slice(0, 400)}</div>}
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+          {done && run.report && (
+            <div className="flex items-center gap-2 pt-1">
+              <Button
+                variant="subtle"
+                data-testid="selftest-copy"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(run.report ?? '');
+                    setCopied(true);
+                  } catch {
+                    setCopied(false);
+                  }
+                }}
+              >
+                {copied ? '복사됨' : '보고서 복사'}
+              </Button>
+              {run.reportPath && <span className="break-all text-[10px] text-muted">저장: {run.reportPath}</span>}
+            </div>
+          )}
+          {done && <p className="text-[10px] text-muted">보고서를 복사해 개발 담당(Claude)에게 붙여 넣어 주시면, 실제 결과를 바탕으로 고칩니다.</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AISettingsDialog() {
   const { open, tab, status, loading, error, set } = useAiSettings();
   const health = useProjectStore((s) => s.health);
@@ -487,6 +626,8 @@ export function AISettingsDialog() {
               </div>
             ) : tab === 'models' ? (
               <ModelsTab settings={status.settings} providers={status.providers} />
+            ) : tab === 'selftest' ? (
+              <SelfTestTab providers={status.providers} />
             ) : tab === 'usage' ? (
               <UsageTab settings={status.settings} />
             ) : tab === 'engines' ? (

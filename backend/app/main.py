@@ -32,6 +32,8 @@ def create_app(settings: Settings | None = None, ai: Any = None, providers: dict
                                                                           "dashscope": os.environ.get("DASHSCOPE_API_KEY") or None})
     app.state.ai = AIManager(app.state.ai_store, settings.ai_effort, providers=providers, override=ai)
     app.state.jobs = jobs.JobTracker()
+    from .ai.selftest import SelfTestRegistry
+    app.state.selftests = SelfTestRegistry()
     app.include_router(local.router)
     app.include_router(ai_settings.router)
     app.include_router(v1.router)

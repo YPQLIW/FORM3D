@@ -164,6 +164,31 @@ export interface UsageRow {
   avgLatencyMs: number;
 }
 
+export interface SelfTestLog {
+  request: string;
+  response: { kind?: string; message?: string; options?: string[]; steps?: unknown[]; provider?: string; model?: string; latencyMs?: number };
+}
+export interface SelfTestItem {
+  no: number;
+  title: string;
+  result: 'pending' | 'running' | 'pass' | 'fail' | 'skip';
+  note?: string;
+  seconds?: number;
+  log?: SelfTestLog[];
+}
+export interface SelfTestState {
+  id: string;
+  state: 'running' | 'done' | 'cancelled';
+  provider: string;
+  providerName: string;
+  model: string;
+  paid: boolean;
+  current: number;
+  items: SelfTestItem[];
+  reportPath: string | null;
+  report: string | null;
+}
+
 async function request(path: string, init: RequestInit = {}, timeoutMs = 60000): Promise<Response> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -231,6 +256,12 @@ export const api = {
   aiPlan: (text: string, scene: SceneSummary, conversation?: string, signal?: AbortSignal) =>
     json<AiPlanResponse>(request('/ai/plan', { ...jsonBody('POST', { text, scene, conversation }), signal }, 700000)),
   aiStatus: () => json<AiStatus>(request('/ai/status', {}, 15000)),
+  aiConversation: (conv: string) =>
+    json<{ messages: { role: string; content: string }[] }>(request(`/ai/conversations/${encodeURIComponent(conv)}`)).then((r) => r.messages),
+  aiSelfTestStart: (provider?: string, model?: string) =>
+    json<SelfTestState>(request('/ai/selftest', jsonBody('POST', { provider: provider ?? null, model: model ?? null }))),
+  aiSelfTestGet: (id: string) => json<SelfTestState>(request(`/ai/selftest/${id}`, {}, 15000)),
+  aiSelfTestCancel: (id: string) => request(`/ai/selftest/${id}/cancel`, { method: 'POST' }).then(() => undefined),
   aiSaveSettings: (patch: Partial<AiSettings>) =>
     json<{ settings: AiSettings }>(request('/ai/settings', jsonBody('PUT', patch))).then((r) => r.settings),
   aiSetKey: (pid: ProviderId, key: string) => json<ProviderInfo>(request(`/ai/keys/${pid}`, jsonBody('PUT', { key }))),

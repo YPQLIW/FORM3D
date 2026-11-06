@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, Request
@@ -174,6 +175,27 @@ async def ai_models(request: Request, token: dict = Depends(require_token)) -> d
     providers = [{k: v for k, v in p.items() if k not in ("key", "hint", "recommended")} for p in st["providers"]]
     return {"default": st.get("default"), "available": st.get("available"), "providers": providers,
             "active": await run_in_threadpool(m.describe_active)}
+
+
+@router.get("/conversations/{conv}")
+def conversation_history(conv: str, request: Request, limit: int = 50, token: dict = Depends(require_token)) -> dict[str, Any]:
+    """대화 기록 조회: /assist 에 보낸 요청, AI 응답(요약), 실행 결과. 대화 ID를 생략했던 경우 oni-<토큰ID>"""
+    check_scopes(token, {"scene:read"})
+    rows = request.app.state.ai_store.history(conv[:80], max(1, min(limit, 200)))
+    out = []
+    for r in rows:
+        item: dict[str, Any] = {"role": r["role"], "text": r["content"]}
+        if r["role"] == "assistant":
+            try:
+                b = json.loads(r["content"])
+                item = {"role": "assistant", "kind": b.get("kind"), "text": b.get("message") or b.get("summary") or "",
+                        "steps": b.get("steps") or []}
+            except ValueError:
+                pass
+        elif r["content"].startswith("[실행 결과]"):
+            item = {"role": "result", "text": r["content"][len("[실행 결과]"):].strip()}
+        out.append(item)
+    return {"conversation": conv[:80], "messages": out}
 
 
 class AssistBody(BaseModel):

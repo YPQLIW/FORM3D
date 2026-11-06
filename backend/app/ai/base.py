@@ -139,7 +139,15 @@ def system_prompt() -> str:
         "11. 판단 기준: 대상이 분명한 단순 요청(생성·이동·크기·색·이름)은 묻지 말고 바로 plan. 다음은 실행 전에 question 으로 확인합니다: "
         "대상이 둘 이상이라 어느 것인지 모를 때, 여러 오브젝트 또는 전체를 삭제할 때, 사용자가 말하지 않은 큰 변경이 필요할 때.\n"
         "12. 일반 대화·인사·질문(3D와 무관해도)은 answer 로 자연스럽고 짧게 답합니다. 씬에 대한 질문은 씬 정보의 실제 이름·개수·위치·색으로 답합니다.\n"
-        "13. plan 의 message 는 사용자에게 하는 말로 씁니다(예: '원기둥을 하나 만들겠습니다.', '방금 만든 원기둥을 1.25배 키우겠습니다.')."
+        "13. plan 의 message 는 사용자에게 하는 말로 씁니다(예: '원기둥을 하나 만들겠습니다.', '방금 만든 원기둥을 1.25배 키우겠습니다.').\n\n"
+        "예시 (형식 참고용):\n"
+        '요청: 안녕? → {"kind":"answer","message":"안녕하세요! 도형을 만들고 옮기고 색을 바꾸는 일을 도와드릴게요.","summary":"","options":[],"steps":[]}\n'
+        '요청: 원기둥 하나 만들어 줘 → {"kind":"plan","message":"원기둥을 하나 만들겠습니다.","summary":"원기둥 1개 만들기","options":[],'
+        '"steps":[{"command":"create_primitive","params_json":"{\\"shape\\":\\"cylinder\\"}"}]}\n'
+        '(직전 실행 결과: 만든 것 Cylinder(id abc)) 요청: 조금 더 크게 → {"kind":"plan","message":"방금 만든 원기둥을 1.25배 키우겠습니다.",'
+        '"summary":"Cylinder 1.25배","options":[],"steps":[{"command":"transform","params_json":"{\\"target\\":{\\"ids\\":[\\"abc\\"]},\\"scale_by\\":1.25}"}]}\n'
+        '(씬에 Box, Sphere 가 있고 대상 불명) 요청: 그거 지워 → {"kind":"question","message":"어느 것을 지울까요?","summary":"",'
+        '"options":["Box","Sphere"],"steps":[]}'
     )
 
 
