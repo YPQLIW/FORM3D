@@ -89,7 +89,22 @@ jobs:
         shell: pwsh
         run: |
           npm ci
-          npx electron-builder --win nsis --publish always
+          npx electron-builder --win nsis --publish never
+
+      - name: GitHub Releases 에 올리기 (자동 업데이트용)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $ver = (Get-Content desktop/package.json -Raw | ConvertFrom-Json).version
+          $tag = "v$ver"
+          gh release view $tag 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --target "${{ github.sha }}" --title "FORM3D $ver" `
+              --notes "FORM3D $ver 설치 파일입니다. 아래 FORM3D-Setup-$ver.exe 를 받아 실행하세요. 이미 설치했다면 프로그램이 자동으로 업데이트합니다."
+          }
+          gh release upload $tag "desktop/release/FORM3D-Setup-$ver.exe" "desktop/release/FORM3D-Setup-$ver.exe.blockmap" "desktop/release/latest.yml" --clobber
+          Write-Host "올림 완료: https://github.com/${{ github.repository }}/releases/tag/$tag"
 
       - uses: actions/upload-artifact@v4
         with:
