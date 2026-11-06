@@ -67,10 +67,30 @@ class AIManager:
                 "label": p.label, "paid": p.paid, "local": p.local}
 
     # ------------------------------------------------ 모델 선택
+    def _usable(self, pid: str, model: str) -> bool:
+        p = self.providers.get(pid)
+        if p is None or not model:
+            return False
+        try:
+            return p.status().state == "ready"
+        except Exception:  # noqa: BLE001 — 상태 확인 실패 = 사용 불가
+            return False
+
     def resolve(self, task: str) -> list[tuple[str, str]]:
         s = self.store.settings()
         first = s["tasks"].get(task) or s["default"]
-        chain = [(first["provider"], first.get("model") or s["providers"][first["provider"]].get("model", ""))]
+        pid0 = first["provider"]
+        model0 = first.get("model") or s["providers"][pid0].get("model", "") or (self.model_for(pid0) if pid0 == "ollama" else "")
+        chain = [(pid0, model0)]
+        # 지정한 기본 모델을 쓸 수 없으면(키 없음·꺼짐) 연결된 다른 AI를 자동으로 사용: 무료 로컬(Ollama) → Qwen API → Claude
+        # (실제로 쓰는 모델은 화면 상태줄과 카드에 그대로 표시됩니다)
+        if not self._usable(pid0, model0):
+            for pid in ("ollama", "dashscope", "claude"):
+                if pid != pid0 and pid in self.providers:
+                    m = self.model_for(pid)
+                    if self._usable(pid, m):
+                        chain = [(pid, m)]
+                        break
         if s["fallback"]["enabled"]:
             for pid in s["fallback"]["order"]:
                 if pid in self.providers and pid not in [c[0] for c in chain]:
@@ -183,6 +203,13 @@ class AIManager:
         m = s["providers"][pid].get("model", "")
         if not m and s["default"]["provider"] == pid:
             m = s["default"].get("model", "")
+        if not m and pid == "ollama" and pid in self.providers:
+            # Ollama 에서 모델을 고르지 않았으면 설치된 첫 모델 사용
+            try:
+                installed = self.providers[pid].list_models()
+                m = installed[0].id if installed else ""
+            except Exception:  # noqa: BLE001
+                m = ""
         return m
 
     def test(self, pid: str, model: str | None) -> dict[str, Any]:

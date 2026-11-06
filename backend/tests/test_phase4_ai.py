@@ -191,7 +191,20 @@ def test_fallback_to_next_provider(app_client):
                       "ollama": {"model": "qwen3:8b", "url": "http://127.0.0.1:11434"}}})
     assert r.status_code == 200, r.text
     body = app_client.post("/api/ai/plan", json={"text": "구"}).json()
-    assert body["provider"] == "ollama" and body["fallbackFrom"][0]["provider"] == "claude"
+    # v0.4.6: 키 없는 기본 모델은 처음부터 건너뛰고 연결된 Ollama 를 바로 사용
+    assert body["provider"] == "ollama"
+
+
+def test_unusable_default_auto_uses_connected_local_model(app_client):
+    """기본이 Claude(키 없음)여도, Ollama 가 켜져 있고 모델이 있으면 Assistant 가 자동으로 그것을 사용"""
+    h = app_client.get("/api/health").json()["ai"]
+    assert h["configured"] is True and h["provider"] == "ollama" and h["model"] == "qwen3:8b" and h["paid"] is False
+    body = app_client.post("/api/ai/plan", json={"text": "구"}).json()
+    assert body["provider"] == "ollama" and body["model"] == "qwen3:8b"
+    # 사용자가 Qwen API 키를 등록하고 기본으로 지정하면 그 설정을 그대로 따름
+    app_client.put("/api/ai/keys/dashscope", json={"key": "sk-abcdefgh12345678"})
+    app_client.put("/api/ai/settings", json={"default": {"provider": "dashscope", "model": "qwen-plus"}})
+    assert app_client.get("/api/health").json()["ai"]["provider"] == "dashscope"
 
 
 def test_task_specific_model(app_client):
