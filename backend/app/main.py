@@ -43,8 +43,16 @@ def create_app(settings: Settings | None = None, ai: Any = None, providers: dict
 
 
 def main() -> None:
+    import sys
+
     import uvicorn
 
+    # Windows 콘솔(cp1252 등)에서도 한글 출력 때문에 멈추지 않도록
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
+        except (AttributeError, ValueError):
+            pass
     settings = load_settings()
     app = create_app(settings)
     print(f"[FORM3D] 로컬 서버 시작: http://{settings.host}:{settings.port}")

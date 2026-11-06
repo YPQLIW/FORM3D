@@ -65,6 +65,7 @@ jobs:
           $env:FORM3D_WEB_DIST = (Resolve-Path desktop/stage/form3d/web).Path
           $env:FORM3D_DATA_DIR = "$env:RUNNER_TEMP\form3d-data"
           $env:FORM3D_PORT = "8799"
+          $env:PYTHONUTF8 = "1"
           $p = Start-Process -FilePath desktop/stage/python/python.exe -ArgumentList "-m","app.main" `
             -WorkingDirectory desktop/stage/form3d/backend -PassThru -NoNewWindow
           $ok = $false
@@ -76,8 +77,9 @@ jobs:
               if ($h.ok -and $page.Content -match 'FORM3D') { $ok = $true; break }
             } catch {}
           }
-          Stop-Process -Id $p.Id -Force
+          Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
           if (-not $ok) { throw "내장 Python 서버가 시작되지 않았습니다" }
+          Remove-Item -Recurse -Force "$env:FORM3D_DATA_DIR" -ErrorAction SilentlyContinue
           Write-Host "서버 확인 완료: health ok, 편집기 화면 제공"
 
       - name: 설치 파일 만들기
