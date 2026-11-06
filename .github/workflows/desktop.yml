@@ -1,11 +1,13 @@
 # FORM3D 설치형 프로그램(Windows) 만들기
-# - 버전 태그(v0.4.5 등)를 올리면: 설치 파일을 만들고 GitHub Releases 에 올립니다 → 설치된 프로그램이 자동 업데이트
-# - Actions 화면에서 직접 실행(workflow_dispatch)하면: 설치 파일만 만들어 다운로드용으로 보관합니다 (릴리스 안 함)
+# - main 에서 package.json 버전이 바뀌면(또는 Actions 화면에서 직접 실행하면):
+#   설치 파일을 만들어 GitHub Releases 의 v버전 에 올립니다 → 설치된 프로그램이 자동 업데이트
+# - 같은 버전이 이미 릴리스되어 있으면 새로 올리지 않습니다.
 name: Desktop (Windows)
 
 on:
   push:
-    tags: ['v*']
+    branches: [main]
+    paths: ['package.json']
   workflow_dispatch:
 
 permissions:
@@ -85,11 +87,7 @@ jobs:
         shell: pwsh
         run: |
           npm ci
-          if ("${{ github.ref_type }}" -eq "tag") {
-            npx electron-builder --win nsis --publish always
-          } else {
-            npx electron-builder --win nsis --publish never
-          }
+          npx electron-builder --win nsis --publish always
 
       - uses: actions/upload-artifact@v4
         with:
