@@ -1,0 +1,12 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+.vite/
+test-results/
+# Python
+__pycache__/
+*.pyc
+.venv/
+# 로컬 데이터 (Phase 3 이후)
+backend/data/

@@ -1,0 +1,97 @@
+{
+  "$comment": "FORM3D 편집 명령 표준 (사람 UI · 내장 AI · 외부 AI(온이)가 공유). 이 파일이 유일한 기준이며 웹 편집기(TypeScript)와 백엔드(Python)가 모두 읽습니다.",
+  "protocol": "form3d.command",
+  "version": "1.0",
+  "target": {
+    "description": "명령 대상. \"selection\"(현재 선택, 기본값) | \"all\"(최상위 오브젝트 전체) | \"created\"(같은 작업의 앞 단계에서 만든 오브젝트) | {\"names\": [\"Box\"]} | {\"ids\": [\"uuid\"]}"
+  },
+  "commands": {
+    "create_primitive": {
+      "description": "기본 도형을 만든다",
+      "scope": "scene:write",
+      "params": {
+        "shape": { "type": "enum", "values": ["box", "sphere", "cylinder", "cone", "torus", "plane"], "required": true, "description": "도형 종류" },
+        "count": { "type": "integer", "min": 1, "max": 20, "description": "개수 (기본 1, 여러 개면 X축으로 나란히)" },
+        "name": { "type": "string", "maxLength": 120, "description": "이름 (없으면 자동)" },
+        "position": { "type": "vec3", "description": "월드 위치 [x,y,z] (없으면 원점 바닥 위)" },
+        "color": { "type": "color", "description": "#rrggbb 색상" }
+      }
+    },
+    "select": {
+      "description": "대상을 선택한다 (기존 선택 대체)",
+      "scope": "scene:write",
+      "params": { "target": { "type": "target", "required": true } }
+    },
+    "clear_selection": { "description": "선택을 모두 해제한다", "scope": "scene:write", "params": {} },
+    "transform": {
+      "description": "위치·회전·크기를 바꾼다. translate/rotate_deg/scale_by는 현재 값 기준 상대 변경, position/rotation_deg/scale은 절대값",
+      "scope": "scene:write",
+      "params": {
+        "target": { "type": "target" },
+        "translate": { "type": "vec3", "description": "월드 기준 이동량 [x,y,z]. +x 오른쪽, +y 위, +z 앞" },
+        "position": { "type": "vec3", "description": "월드 위치 [x,y,z]" },
+        "rotate_deg": { "type": "vec3", "description": "회전 추가량(도) [x,y,z]" },
+        "rotation_deg": { "type": "vec3", "description": "회전 절대값(도) [x,y,z]" },
+        "scale_by": { "type": "scale", "description": "크기 배율 (숫자 또는 [x,y,z])" },
+        "scale": { "type": "vec3", "description": "크기 절대값 [x,y,z]" }
+      }
+    },
+    "set_material": {
+      "description": "재질 색상·금속성·거칠기를 바꾼다 (그룹이면 안의 모든 메시)",
+      "scope": "scene:write",
+      "params": {
+        "target": { "type": "target" },
+        "color": { "type": "color" },
+        "metalness": { "type": "number", "min": 0, "max": 1 },
+        "roughness": { "type": "number", "min": 0, "max": 1 }
+      }
+    },
+    "duplicate": {
+      "description": "대상을 복제한다 (복제본이 선택됨)",
+      "scope": "scene:write",
+      "params": {
+        "target": { "type": "target" },
+        "count": { "type": "integer", "min": 1, "max": 20 }
+      }
+    },
+    "group": {
+      "description": "대상을 하나의 그룹으로 묶는다",
+      "scope": "scene:write",
+      "params": { "target": { "type": "target" }, "name": { "type": "string", "maxLength": 120 } }
+    },
+    "ungroup": { "description": "그룹을 해제한다", "scope": "scene:write", "params": { "target": { "type": "target" } } },
+    "delete": { "description": "대상을 삭제한다", "scope": "scene:write", "params": { "target": { "type": "target" } } },
+    "rename": {
+      "description": "이름을 바꾼다 (대상은 1개여야 함)",
+      "scope": "scene:write",
+      "params": { "target": { "type": "target" }, "name": { "type": "string", "required": true, "maxLength": 120 } }
+    },
+    "set_visibility": {
+      "description": "숨기거나 보이게 한다",
+      "scope": "scene:write",
+      "params": { "target": { "type": "target" }, "visible": { "type": "boolean", "required": true } }
+    },
+    "align": {
+      "description": "대상들을 축 기준으로 정렬한다 (2개 이상)",
+      "scope": "scene:write",
+      "params": {
+        "target": { "type": "target" },
+        "axis": { "type": "enum", "values": ["x", "y", "z"], "required": true },
+        "mode": { "type": "enum", "values": ["min", "center", "max"], "required": true }
+      }
+    },
+    "distribute": {
+      "description": "대상들을 축 방향으로 같은 간격 배치한다 (3개 이상)",
+      "scope": "scene:write",
+      "params": { "target": { "type": "target" }, "axis": { "type": "enum", "values": ["x", "y", "z"], "required": true } }
+    },
+    "drop_to_floor": { "description": "대상의 밑면을 바닥(Y=0)에 붙인다", "scope": "scene:write", "params": { "target": { "type": "target" } } },
+    "set_view": {
+      "description": "카메라 시점을 바꾼다",
+      "scope": "view",
+      "params": { "preset": { "type": "enum", "values": ["front", "back", "right", "left", "top", "bottom", "iso"], "required": true } }
+    },
+    "frame": { "description": "대상(없으면 전체)에 카메라를 맞춘다", "scope": "view", "params": { "target": { "type": "target" } } }
+  },
+  "limits": { "maxStepsPerJob": 30 }
+}
